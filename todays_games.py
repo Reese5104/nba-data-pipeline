@@ -11,9 +11,7 @@ import pandas as pd
 import time
 
 
-# -------------------------------------------------------------------
 # API REQUEST HEADERS
-# -------------------------------------------------------------------
 # The NBA stats API blocks requests that don't look like a browser.
 # These headers mimic a real browser so the API accepts our request.
 NBAStatsHTTP.headers = {
@@ -23,16 +21,8 @@ NBAStatsHTTP.headers = {
     "Referer": "https://www.nba.com/",
 }
 
-
-# -------------------------------------------------------------------
-# DATABASE NAME
-# -------------------------------------------------------------------
 DB_NAME = "nba_data.db"
 
-
-# -------------------------------------------------------------------
-# CREATE LIVE GAMES TABLE
-# -------------------------------------------------------------------
 # This table stores the current state of games today.
 # It updates continuously as the pipeline runs.
 def initialize_live_table(conn):
@@ -55,9 +45,6 @@ def initialize_live_table(conn):
     conn.commit()
 
 
-# -------------------------------------------------------------------
-# FETCH SCOREBOARD (WITH RETRIES)
-# -------------------------------------------------------------------
 # Sometimes the NBA API fails temporarily.
 # This function retries the request up to 3 times.
 def fetch_scoreboard(today):
@@ -80,33 +67,23 @@ def fetch_scoreboard(today):
     return None
 
 
-# -------------------------------------------------------------------
-# SAVE FINAL GAME DATA
-# -------------------------------------------------------------------
 # Once a game is finished we store the full boxscore
 # into permanent tables:
-#
 # team_games
-# player_boxscore
-# team_boxscore
-#
+# player_boxscores
+# team_boxscores
+
 def save_final_game(game_id, conn):
 
     print(f"Saving FINAL game {game_id}")
 
-    # ---------------------------------------------------------------
-    # FETCH BOXSCORE WITH RETRIES
-    # ---------------------------------------------------------------
     # Sometimes a game is marked "Final" but the boxscore
     # endpoint is not populated yet.
     for attempt in range(3):
 
         try:
 
-            box = boxscoretraditionalv2.BoxScoreTraditionalV2(
-                game_id=game_id,
-                timeout=30
-            ).get_data_frames()
+            box = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=30).get_data_frames()
 
             player_stats = box[0].copy()
             team_stats = box[1].copy()
@@ -131,16 +108,12 @@ def save_final_game(game_id, conn):
         return
 
 
-    # ---------------------------------------------------------------
     # ADD GAME_ID COLUMN
-    # ---------------------------------------------------------------
     player_stats["GAME_ID"] = game_id
     team_stats["GAME_ID"] = game_id
 
 
-    # ---------------------------------------------------------------
     # TEAM_GAMES TABLE
-    # ---------------------------------------------------------------
     home = team_stats.iloc[0]
     away = team_stats.iloc[1]
 
@@ -168,9 +141,7 @@ def save_final_game(game_id, conn):
     )
 
 
-    # ---------------------------------------------------------------
-    # PLAYER BOXSCORE TABLE
-    # ---------------------------------------------------------------
+    # PLAYER BOXSCORES TABLE
     player_cols = [
 
         "GAME_ID",
@@ -191,17 +162,10 @@ def save_final_game(game_id, conn):
         (game_id,)
     )
 
-    player_stats[player_cols].to_sql(
-        "player_boxscores",
-        conn,
-        if_exists="append",
-        index=False
-    )
+    player_stats[player_cols].to_sql("player_boxscores", conn, if_exists="append", index=False)
 
 
-    # ---------------------------------------------------------------
     # TEAM BOXSCORE TABLE
-    # ---------------------------------------------------------------
     team_cols = [
 
         "GAME_ID",
@@ -218,19 +182,11 @@ def save_final_game(game_id, conn):
         (game_id,)
     )
 
-    team_stats[team_cols].to_sql(
-        "team_boxscores",
-        conn,
-        if_exists="append",
-        index=False
-    )
+    team_stats[team_cols].to_sql("team_boxscores", conn, if_exists="append", index=False)
 
     conn.commit()
 
 
-# -------------------------------------------------------------------
-# MAIN PIPELINE
-# -------------------------------------------------------------------
 def run_pipeline():
 
     # Format today's date for NBA API
@@ -248,9 +204,7 @@ def run_pipeline():
         return
 
 
-    # ---------------------------------------------------------------
     # EXTRACT DATAFRAMES
-    # ---------------------------------------------------------------
     games_df = scoreboard.get_data_frames()[0]
     linescore_df = scoreboard.get_data_frames()[1]
 
@@ -263,9 +217,7 @@ def run_pipeline():
     live_rows = []
 
 
-    # ---------------------------------------------------------------
     # PROCESS EACH GAME
-    # ---------------------------------------------------------------
     for _, game in games_df.iterrows():
 
         game_id = game["GAME_ID"]
@@ -307,17 +259,12 @@ def run_pipeline():
     live_df = pd.DataFrame(live_rows)
 
 
-    # ---------------------------------------------------------------
-    # DATABASE CONNECTION
-    # ---------------------------------------------------------------
     conn = sqlite3.connect(DB_NAME)
 
     initialize_live_table(conn)
 
 
-    # ---------------------------------------------------------------
     # UPDATE LIVE GAMES TABLE
-    # ---------------------------------------------------------------
     for game_id in live_df["GAME_ID"]:
 
         conn.execute(
@@ -335,9 +282,7 @@ def run_pipeline():
     )
 
 
-    # ---------------------------------------------------------------
     # PROCESS FINAL GAMES
-    # ---------------------------------------------------------------
     finals = live_df[
         live_df["GAME_STATUS_TEXT"].str.contains("Final")
     ]
@@ -354,10 +299,6 @@ def run_pipeline():
 
     print("Pipeline complete.")
 
-
-# -------------------------------------------------------------------
-# SCRIPT ENTRY POINT
-# -------------------------------------------------------------------
 # This ensures the pipeline only runs when the file
 # is executed directly.
 if __name__ == "__main__":
