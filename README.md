@@ -139,20 +139,4 @@ Interests:
 
 ```
 
-5. Click **Commit new file**
 
----
-
-### Quick Tip
-Once it's saved, GitHub will automatically display the README on the **front page of your repo**, which is what recruiters see first.
-
----
-
-If you want, I can also show you **how to add 4 things that instantly make your GitHub look like a professional data engineer's repo**:
-- architecture diagram  
-- pipeline flow chart  
-- example SQL queries  
-- dataset preview  
-
-Those make projects **stand out a lot when applying for internships.**
-```
