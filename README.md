@@ -49,8 +49,6 @@ The goal of this project is to build a reliable sports data pipeline that can su
 
 ## Project Structure
 
-```
-
 sports-model/
 │
 ├── pipeline.py
@@ -58,7 +56,7 @@ sports-model/
 ├── nba_data.db
 └── README.md
 
-````
+
 
 ---
 
