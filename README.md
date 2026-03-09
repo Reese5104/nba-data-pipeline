@@ -1,16 +1,3 @@
-### Steps on GitHub
-
-1. Go to your repository.
-2. Click **Add file** → **Create new file**.
-3. Name the file:
-
-```
-README.md
-```
-
-4. Paste the following:
-
-```markdown
 # NBA Data Pipeline
 
 A Python data pipeline that collects NBA game data using the nba_api and stores player and team box scores in a SQLite database for sports analytics and modeling.
@@ -19,9 +6,15 @@ A Python data pipeline that collects NBA game data using the nba_api and stores 
 
 ## Overview
 
-This project automates the process of collecting NBA game data and storing it in a structured database. The pipeline pulls data from the NBA Stats API, retrieves player and team box scores, and saves the results into a SQLite database.
+This project automates the collection of NBA game statistics using the NBA Stats API.  
+The pipeline retrieves game information, player statistics, and team box scores, then stores the results in a structured SQLite database.
 
-The goal of this project is to build a reliable sports data pipeline that can support analytics models, betting models, or machine learning applications.
+The goal of this project is to create a reliable dataset for:
+
+- sports analytics
+- predictive modeling
+- machine learning projects
+- basketball performance analysis
 
 ---
 
@@ -30,10 +23,12 @@ The goal of this project is to build a reliable sports data pipeline that can su
 - Collects NBA game data using nba_api
 - Retrieves player box scores
 - Retrieves team box scores
-- Stores data in SQLite
+- Tracks live games for the current day
+- Updates game results once games are final
+- Stores structured data in SQLite
 - Prevents duplicate game inserts
-- Includes retry logic to handle API errors
-- Rate limiting to prevent API blocking
+- Includes retry logic to handle API failures
+- Uses rate limiting to avoid API blocking
 
 ---
 
@@ -43,29 +38,71 @@ The goal of this project is to build a reliable sports data pipeline that can su
 - Pandas
 - SQLite
 - nba_api
-- Git / GitHub
+- Git
 
 ---
 
 ## Project Structure
 
+```
 sports-model/
 │
-├── pipeline.py
-├── todays_games.py
-├── nba_data.db
-└── README.md
+├── boxscore_teamgames.py      # Historical pipeline that collects team and player box scores
+├── career_stats.py            # Collects career statistics for NBA players
+├── todays_games.py            # Tracks and stores today's NBA games
+├── uptd_team_boxscores.py     # Updates database with final box scores after games finish
+└── README.md                  # Project documentation
+```
 
+---
 
+## Script Descriptions
+
+### boxscore_teamgames.py
+
+Pulls historical NBA game data and retrieves player and team box scores using the NBA Stats API.  
+The cleaned data is saved to a SQLite database.
+
+---
+
+### career_stats.py
+
+Collects career statistics for NBA players.  
+This data can be used to enrich datasets for modeling or player analysis.
+
+---
+
+### todays_games.py
+
+Tracks live NBA games for the current day.  
+This script monitors game status and prepares games for final stat ingestion.
+
+---
+
+### uptd_team_boxscores.py
+
+Updates the database with final team and player box scores once games are completed.
+
+---
+
+## Pipeline Flow
+
+1. Fetch NBA games from the NBA Stats API
+2. Identify games not already stored in the database
+3. Retrieve player and team box scores
+4. Clean and structure the data using pandas
+5. Store results in SQLite tables
 
 ---
 
 ## Database Tables
 
 ### team_games
+
 Stores basic game-level information.
 
 Columns include:
+
 - GAME_ID
 - GAME_DATE
 - TEAM_ID
@@ -74,10 +111,14 @@ Columns include:
 - WL
 - PTS
 
+---
+
 ### player_boxscores
+
 Stores player statistics for each game.
 
 Examples:
+
 - PLAYER_ID
 - PLAYER_NAME
 - TEAM_ID
@@ -85,56 +126,82 @@ Examples:
 - PTS
 - AST
 - REB
+- FG_PCT
+
+---
 
 ### team_boxscores
-Stores team-level game statistics.
+
+Stores team-level statistics for each game.
 
 Examples:
+
 - TEAM_ID
 - GAME_ID
 - PTS
 - REB
 - AST
+- FG_PCT
+- TURNOVERS
 
 ---
 
-## Running the Pipeline
+## Running the Project
 
-Run the pipeline using:
+Install dependencies:
 
 ```bash
-python pipeline.py
-````
+pip install nba_api pandas
+```
 
-The pipeline will:
+Run a pipeline script:
 
-1. Fetch NBA games
-2. Retrieve box scores
-3. Save the data into the SQLite database
+```bash
+python boxscore_teamgames.py
+```
+
+or
+
+```bash
+python todays_games.py
+```
+
+The scripts will fetch NBA data and update the SQLite database.
+
+---
+
+## Data Source
+
+This project uses the NBA Stats API through the Python package:
+
+nba_api
+
+The API provides official NBA statistics including:
+
+- game results
+- player statistics
+- team statistics
 
 ---
 
 ## Future Improvements
 
-* Automate daily updates
-* Add predictive modeling
-* Build sports analytics dashboards
-* Deploy pipeline to the cloud
+- Automate daily pipeline runs
+- Add machine learning models for game prediction
+- Create player performance dashboards
+- Deploy pipeline to a cloud environment
+- Build advanced analytics features
 
 ---
 
 ## Author
 
-Reese Farquharson
-Computer Science Major
-West Virginia Wesleyan College
+Reese Farquharson  
+Computer Science Major  
+West Virginia Wesleyan College  
 
-Interests:
+Interested in:
 
-* Sports Analytics
-* Data Science
-* Cybersecurity
-
-```
-
-
+- Data Science
+- Sports Analytics
+- Cybersecurity
