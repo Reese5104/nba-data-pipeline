@@ -1,13 +1,10 @@
-# -------------------------------------------------------
 # NBA POST–ALL-STAR DATA INGESTION PIPELINE
-# -------------------------------------------------------
 # This pipeline:
 # 1. Pulls all NBA games for a given season
 # 2. Filters games occurring after the All-Star break
 # 3. Checks which games are already stored in the database
 # 4. Fetches player and team box scores for only NEW games
 # 5. Saves the results into SQLite tables
-# -------------------------------------------------------
 
 # NBA API endpoints used to pull game and boxscore data
 from nba_api.stats.endpoints import leaguegamefinder
@@ -26,13 +23,11 @@ import sqlite3
 import time
 
 
-# -------------------------------------------------------
 # NBA API Browser Headers
-# -------------------------------------------------------
 # The NBA stats API blocks many non-browser requests.
 # These headers mimic a real browser request to avoid
 # HTTP 403 errors or connection timeouts.
-# -------------------------------------------------------
+
 NBAStatsHTTP.headers = {
     "Host": "stats.nba.com",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
@@ -41,9 +36,7 @@ NBAStatsHTTP.headers = {
 }
 
 
-# -------------------------------------------------------
 # CONFIGURATION VARIABLES
-# -------------------------------------------------------
 
 # NBA season to pull
 SEASON = "2025-26"
@@ -60,12 +53,9 @@ DB_NAME = "nba_data.db"
 print("Starting pipeline...")
 
 
-# -------------------------------------------------------
-# STEP 1: FETCH ALL GAMES FOR THE SEASON
-# -------------------------------------------------------
+# FETCH ALL GAMES FOR THE SEASON
 # This uses LeagueGameFinder to retrieve all NBA games
 # played during the specified season.
-# -------------------------------------------------------
 
 retries = 0
 success = False
@@ -97,9 +87,7 @@ if not success:
 df = games.get_data_frames()[0]
 
 
-# -------------------------------------------------------
-# STEP 2: CLEAN GAME DATA
-# -------------------------------------------------------
+# CLEAN GAME DATA
 
 # Select only columns relevant for modeling/storage
 columns_needed = [
@@ -118,9 +106,7 @@ df_clean = df[columns_needed].copy()
 df_clean["GAME_DATE"] = pd.to_datetime(df_clean["GAME_DATE"])
 
 
-# -------------------------------------------------------
-# STEP 3: FILTER POST–ALL-STAR GAMES
-# -------------------------------------------------------
+# FILTER POST–ALL-STAR GAMES
 
 df_clean = df_clean[
     df_clean["GAME_DATE"] >= ALL_STAR_BREAK_END
@@ -139,9 +125,7 @@ unique_game_ids = df_clean["GAME_ID"].unique()
 print(f"Total post–All-Star games: {len(unique_game_ids)}")
 
 
-# -------------------------------------------------------
-# STEP 4: CONNECT TO DATABASE
-# -------------------------------------------------------
+# CONNECT TO DATABASE
 
 conn = sqlite3.connect(DB_NAME)
 
@@ -169,9 +153,7 @@ if not game_ids_to_fetch:
     exit()
 
 
-# -------------------------------------------------------
-# STEP 5: FETCH BOX SCORES
-# -------------------------------------------------------
+# FETCH BOX SCORES
 
 all_player_boxscores = []
 all_team_boxscores = []
@@ -227,9 +209,7 @@ for game_id in game_ids_to_fetch:
         print(f"Skipping {game_id} after {MAX_RETRIES} attempts.")
 
 
-# -------------------------------------------------------
-# STEP 6: SAVE DATA TO SQLITE
-# -------------------------------------------------------
+# SAVE DATA TO SQLITE
 
 print("Saving to SQLite...")
 
