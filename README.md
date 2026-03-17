@@ -86,6 +86,12 @@ Updates the database with final team and player box scores once games are comple
 
 ---
 
+### live_games.py 
+
+Pulls today's NBA games from the API and updates the live_games database table
+
+---
+
 ## Pipeline Flow
 
 1. Fetch NBA games from the NBA Stats API
