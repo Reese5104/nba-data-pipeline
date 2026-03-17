@@ -50,6 +50,7 @@ sports-model/
 ├── boxscore_teamgames.py      # Historical pipeline that collects team and player box scores
 ├── career_stats.py            # Collects career statistics for NBA players
 ├── todays_games.py            # Tracks and stores today's NBA games
+├── live_games.py              # Fetches today's NBA schedule and live scores 
 ├── uptd_team_boxscores.py     # Updates database with final box scores after games finish
 └── README.md                  # Project documentation
 ```
