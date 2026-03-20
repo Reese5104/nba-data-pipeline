@@ -1,4 +1,3 @@
-
 # Import NBA API endpoints for game and box score data
 from nba_api.stats.endpoints import (
     leaguegamefinder,          # Gets list of games
