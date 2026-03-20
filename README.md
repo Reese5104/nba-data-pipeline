@@ -50,6 +50,7 @@ sports-model/
 ├── boxscore_teamgames.py      # Historical pipeline that collects team and player box scores
 ├── career_stats.py            # Collects career statistics for NBA players
 ├── todays_games.py            # Tracks and stores today's NBA games
+├── boxscore_adv.py            # Advanced player boxscore pipeline
 ├── live_games.py              # Fetches today's NBA schedule and live scores 
 ├── uptd_team_boxscores.py     # Updates database with final box scores after games finish
 └── README.md                  # Project documentation
@@ -63,6 +64,13 @@ sports-model/
 
 Pulls historical NBA game data and retrieves player and team box scores using the NBA Stats API.  
 The cleaned data is saved to a SQLite database.
+
+---
+
+### boxscore_adv.py
+
+Extracts advanced player statistics (e.g., efficiency, usage rate, advanced metrics) for full NBA seasons.
+Designed for deeper analytics and modeling workflows.
 
 ---
 
