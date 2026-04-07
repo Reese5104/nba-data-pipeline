@@ -1,15 +1,13 @@
----
 
 # 🏀 NBA Data Pipeline & Prediction System
 
-- "[![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)"
-- "[![SQLite](https://img.shields.io/badge/SQLite-database-orange)](https://www.sqlite.org/)"
-- "[![NBA API](https://img.shields.io/badge/NBA_API-Stats-green)](https://github.com/swar/nba_api)"
-- "[![XGBoost](https://img.shields.io/badge/XGBoost-ML-red)](https://xgboost.readthedocs.io/)"
+[![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-database-orange)](https://www.sqlite.org/)
+[![NBA API](https://img.shields.io/badge/NBA_API-Stats-green)](https://github.com/swar/nba_api)
+[![XGBoost](https://img.shields.io/badge/XGBoost-ML-red)](https://xgboost.readthedocs.io/)
 
 A Python-based data pipeline and machine learning system that collects NBA game data, stores player and team box scores in SQLite, and predicts upcoming game outcomes in real-time.
 
----
 
 ## Overview
 
