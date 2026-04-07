@@ -154,8 +154,8 @@ python todays_games.py
 Run ML / prediction scripts:
 
 ```bash
-python nba_ete_pL.py             # Train model
-python upt_ete_pL.py             # Update model
+python nba_ete_pL.py             # Collect data for model
+python upt_ete_pL.py             # Update data for model
 python game_model_training.py    # Train standalone game prediction model
 python live_game_prediction.py   # Predict games
 ```
