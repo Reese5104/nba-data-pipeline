@@ -1,44 +1,40 @@
-# NBA Data Pipeline
+---
 
-A Python data pipeline that collects NBA game data using the nba_api and stores player and team box scores in a SQLite database for sports analytics and modeling.
+# 🏀 NBA Data Pipeline & Prediction System
+
+[![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-database-orange)](https://www.sqlite.org/)
+[![NBA API](https://img.shields.io/badge/NBA_API-Stats-green)](https://github.com/swar/nba_api)
+[![XGBoost](https://img.shields.io/badge/XGBoost-ML-red)](https://xgboost.readthedocs.io/)
+
+A Python-based data pipeline and machine learning system that collects NBA game data, stores player and team box scores in SQLite, and predicts upcoming game outcomes in real-time.
 
 ---
 
 ## Overview
 
-This project automates the collection of NBA game statistics using the NBA Stats API.  
-The pipeline retrieves game information, player statistics, and team box scores, then stores the results in a structured SQLite database.
+This project automates NBA data collection and analytics using the NBA Stats API.
+It retrieves game data, player statistics, team box scores, advanced metrics, and generates **real-time predictions** using ML models.
 
-The goal of this project is to create a reliable dataset for:
+The goal is to provide a **complete analytics pipeline** for:
 
-- sports analytics
-- predictive modeling
-- machine learning projects
-- basketball performance analysis
+* Sports analytics
+* Predictive modeling
+* Machine learning applications
+* Basketball performance analysis
 
 ---
 
 ## Features
 
-- Collects NBA game data using nba_api
-- Retrieves player box scores
-- Retrieves team box scores
-- Tracks live games for the current day
-- Updates game results once games are final
-- Stores structured data in SQLite
-- Prevents duplicate game inserts
-- Includes retry logic to handle API failures
-- Uses rate limiting to avoid API blocking
-
----
-
-## Tech Stack
-
-- Python
-- Pandas
-- SQLite
-- nba_api
-- Git
+* Collects historical and live NBA game data
+* Retrieves player, team, and advanced box scores
+* Tracks live games and updates final results
+* Extracts advanced player metrics for modeling
+* Generates real-time game predictions
+* Stores structured data in SQLite
+* Prevents duplicate entries
+* Retry logic and rate limiting for API reliability
 
 ---
 
@@ -47,12 +43,17 @@ The goal of this project is to create a reliable dataset for:
 ```
 sports-model/
 │
-├── boxscore_teamgames.py      # Historical pipeline that collects team and player box scores
-├── career_stats.py            # Collects career statistics for NBA players
+├── boxscore_teamgames.py      # Historical pipeline for player and team box scores
+├── boxscore_adv.py            # Advanced player statistics pipeline
+├── career_stats.py            # Player career statistics collection
 ├── todays_games.py            # Tracks and stores today's NBA games
-├── boxscore_adv.py            # Advanced player boxscore pipeline
-├── live_games.py              # Fetches today's NBA schedule and live scores 
-├── uptd_team_boxscores.py     # Updates database with final box scores after games finish
+├── live_games.py              # Retrieves live NBA schedule and game status
+├── uptd_team_boxscores.py     # Updates database with final box scores
+│
+├── live_game_prediction.py    # Real-time game prediction script
+├── nba_ete_pL.py              # End-to-end ML training pipeline
+├── upt_ete_pL.py              # Updates and retrains prediction model
+│
 └── README.md                  # Project documentation
 ```
 
@@ -60,53 +61,32 @@ sports-model/
 
 ## Script Descriptions
 
-### boxscore_teamgames.py
+### Data Collection & Processing
 
-Pulls historical NBA game data and retrieves player and team box scores using the NBA Stats API.  
-The cleaned data is saved to a SQLite database.
+* **boxscore_teamgames.py** – Historical NBA game data ingestion
+* **boxscore_adv.py** – Advanced player metrics extraction
+* **career_stats.py** – Player career statistics collection
+* **todays_games.py** – Tracks current-day NBA games
+* **live_games.py** – Pulls live schedules and statuses
+* **uptd_team_boxscores.py** – Updates database with final game stats
 
----
+### Machine Learning & Prediction
 
-### boxscore_adv.py
-
-Extracts advanced player statistics (e.g., efficiency, usage rate, advanced metrics) for full NBA seasons.
-Designed for deeper analytics and modeling workflows.
-
----
-
-### career_stats.py
-
-Collects career statistics for NBA players.  
-This data can be used to enrich datasets for modeling or player analysis.
-
----
-
-### todays_games.py
-
-Tracks live NBA games for the current day.  
-This script monitors game status and prepares games for final stat ingestion.
-
----
-
-### uptd_team_boxscores.py
-
-Updates the database with final team and player box scores once games are completed.
-
----
-
-### live_games.py 
-
-Pulls today's NBA games from the API and updates the live_games database table
+* **live_game_prediction.py** – Generates real-time predictions for NBA games
+* **nba_ete_pL.py** – End-to-end ML training: extraction → feature engineering → training → evaluation
+* **upt_ete_pL.py** – Updates and retrains prediction models with new data
 
 ---
 
 ## Pipeline Flow
 
-1. Fetch NBA games from the NBA Stats API
-2. Identify games not already stored in the database
-3. Retrieve player and team box scores
-4. Clean and structure the data using pandas
-5. Store results in SQLite tables
+1. Data Collection: `boxscore_teamgames.py`, `boxscore_adv.py`
+2. Data Enrichment: `career_stats.py`
+3. Live Tracking: `live_games.py`, `todays_games.py`
+4. Data Finalization: `uptd_team_boxscores.py`
+5. Machine Learning: `nba_ete_pL.py` → `upt_ete_pL.py` → `live_game_prediction.py`
+
+**Result:** A fully automated NBA analytics + prediction pipeline
 
 ---
 
@@ -114,50 +94,35 @@ Pulls today's NBA games from the API and updates the live_games database table
 
 ### team_games
 
-Stores basic game-level information.
-
-Columns include:
-
-- GAME_ID
-- GAME_DATE
-- TEAM_ID
-- TEAM_NAME
-- MATCHUP
-- WL
-- PTS
-
----
+Columns: `GAME_ID`, `GAME_DATE`, `TEAM_ID`, `TEAM_NAME`, `MATCHUP`, `WL`, `PTS`
 
 ### player_boxscores
 
-Stores player statistics for each game.
-
-Examples:
-
-- PLAYER_ID
-- PLAYER_NAME
-- TEAM_ID
-- MIN
-- PTS
-- AST
-- REB
-- FG_PCT
-
----
+Columns: `PLAYER_ID`, `PLAYER_NAME`, `TEAM_ID`, `MIN`, `PTS`, `AST`, `REB`, `FG_PCT`
 
 ### team_boxscores
 
-Stores team-level statistics for each game.
+Columns: `TEAM_ID`, `GAME_ID`, `PTS`, `REB`, `AST`, `FG_PCT`, `TURNOVERS`
 
-Examples:
+---
 
-- TEAM_ID
-- GAME_ID
-- PTS
-- REB
-- AST
-- FG_PCT
-- TURNOVERS
+## Model Performance
+
+The ML pipeline uses **XGBoost** for game predictions. Example metrics from testing:
+
+| Metric           | Value                  |
+| ---------------- | ---------------------- |
+| Accuracy         | 0.9853                 |
+| ROC-AUC          | 0.9991                 |
+| Confusion Matrix | [[1379 17], [23 1311]] |
+
+**Top features contributing to predictions:**
+
+* PIE (Player Impact Estimate)
+* Estimated Offensive Rating
+* Assist Percentage
+
+> These metrics are calculated using historical game and player statistics to predict future outcomes.
 
 ---
 
@@ -166,57 +131,47 @@ Examples:
 Install dependencies:
 
 ```bash
-pip install nba_api pandas
+pip install nba_api pandas scikit-learn xgboost
 ```
 
 Run a pipeline script:
 
 ```bash
 python boxscore_teamgames.py
-```
-
-or
-
-```bash
 python todays_games.py
 ```
 
-The scripts will fetch NBA data and update the SQLite database.
+Run ML / prediction scripts:
+
+```bash
+python nba_ete_pL.py         # Train model
+python upt_ete_pL.py         # Update model
+python live_game_prediction.py  # Predict games
+```
 
 ---
 
 ## Data Source
 
-This project uses the NBA Stats API through the Python package:
-
-nba_api
-
-The API provides official NBA statistics including:
-
-- game results
-- player statistics
-- team statistics
+* NBA Stats API via `nba_api`
+* Provides official NBA game results, player statistics, team statistics, and advanced metrics
 
 ---
 
 ## Future Improvements
 
-- Automate daily pipeline runs
-- Add machine learning models for game prediction
-- Create player performance dashboards
-- Deploy pipeline to a cloud environment
-- Build advanced analytics features
+* Automate daily pipeline runs
+* Add dashboards for player and team performance
+* Deploy pipeline to cloud infrastructure
+* Parallelize data collection and ML training for faster updates
+* Expand ML models for team/player prediction and betting simulations
 
 ---
 
 ## Author
 
-Reese Farquharson  
-Computer Science Major  
-West Virginia Wesleyan College  
+**Reese Farquharson**
+Computer Science Major
+West Virginia Wesleyan College
 
-Interested in:
-
-- Data Science
-- Sports Analytics
-- Cybersecurity
+**Interests:** Data Science, Sports Analytics, Cybersecurity
