@@ -1,4 +1,3 @@
-
 # 🏀 NBA Data Pipeline & Prediction System
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
@@ -7,7 +6,6 @@
 [![XGBoost](https://img.shields.io/badge/XGBoost-ML-red)](https://xgboost.readthedocs.io/)
 
 A Python-based data pipeline and machine learning system that collects NBA game data, stores player and team box scores in SQLite, and predicts upcoming game outcomes in real-time.
-
 
 ## Overview
 
@@ -51,6 +49,7 @@ sports-model/
 ├── live_game_prediction.py    # Real-time game prediction script
 ├── nba_ete_pL.py              # End-to-end ML training pipeline
 ├── upt_ete_pL.py              # Updates and retrains prediction model
+├── game_model_training.py     # Standalone model training script
 │
 └── README.md                  # Project documentation
 ```
@@ -73,6 +72,19 @@ sports-model/
 * **live_game_prediction.py** – Generates real-time predictions for NBA games
 * **nba_ete_pL.py** – End-to-end ML training: extraction → feature engineering → training → evaluation
 * **upt_ete_pL.py** – Updates and retrains prediction models with new data
+* **game_model_training.py** – Standalone script for training the NBA game prediction model
+
+  **Description:**
+
+  * Loads historical NBA game data from SQLite (`nba_data.db`)
+  * Cleans and converts minutes played into numeric format
+  * Forces numeric types for core stats: points, rebounds, assists, minutes
+  * Computes **rolling averages and standard deviations** for teams and opponents
+  * Creates **differential features** (team stats minus opponent stats)
+  * Adds contextual features: home/away indicator, win/loss streaks
+  * Trains an **XGBoost classifier** to predict game outcomes
+  * Evaluates the model using accuracy, ROC-AUC, and confusion matrix
+  * Saves trained model and feature set as `nba_model.pkl` for later prediction
 
 ---
 
@@ -82,7 +94,7 @@ sports-model/
 2. Data Enrichment: `career_stats.py`
 3. Live Tracking: `live_games.py`, `todays_games.py`
 4. Data Finalization: `uptd_team_boxscores.py`
-5. Machine Learning: `nba_ete_pL.py` → `upt_ete_pL.py` → `live_game_prediction.py`
+5. Machine Learning: `nba_ete_pL.py` → `upt_ete_pL.py` → `game_model_training.py` → `live_game_prediction.py`
 
 **Result:** A fully automated NBA analytics + prediction pipeline
 
@@ -142,9 +154,10 @@ python todays_games.py
 Run ML / prediction scripts:
 
 ```bash
-python nba_ete_pL.py         # Train model
-python upt_ete_pL.py         # Update model
-python live_game_prediction.py  # Predict games
+python nba_ete_pL.py             # Train model
+python upt_ete_pL.py             # Update model
+python game_model_training.py    # Train standalone game prediction model
+python live_game_prediction.py   # Predict games
 ```
 
 ---
@@ -173,3 +186,5 @@ Computer Science Major
 West Virginia Wesleyan College
 
 **Interests:** Data Science, Sports Analytics, Cybersecurity
+
+---
