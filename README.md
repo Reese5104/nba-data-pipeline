@@ -112,9 +112,9 @@ The ML pipeline uses **XGBoost** for game predictions. Example metrics from test
 
 | Metric           | Value                  |
 | ---------------- | ---------------------- |
-| Accuracy         | 0.9853                 |
-| ROC-AUC          | 0.9991                 |
-| Confusion Matrix | [[1379 17], [23 1311]] |
+| Accuracy         | 0.6161                 |
+| ROC-AUC          | 0.6589                 |
+| Confusion Matrix | [[800 565], [486 887]] |
 
 **Top features contributing to predictions:**
 
