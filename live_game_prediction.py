@@ -1,239 +1,227 @@
-# Core data handling
 import pandas as pd
 import numpy as np
 import sqlite3
-
-# Model saving/loading
 import pickle
-import os
-
-# Machine learning model
 import xgboost as xgb
 
-# Evaluation metrics
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
-
-# Date handling + NBA API
 from datetime import datetime
 from nba_api.stats.endpoints import scoreboardv3
 
-# CONFIGURATION CONSTANTS
-DB_PATH = "nba_data.db"      # SQLite database path
-MODEL_PATH = "nba_model.pkl" # Saved trained model
-ROLLING_WINDOW = 85          # Number of past games used for rolling stats
+DB_PATH = "nba_data.db"          # SQLite database containing historical NBA games
+MODEL_PATH = "nba_model.pkl"     # Serialized trained model output file
+ROLLING_WINDOW = 20               # Number of past games used for rolling averages
 
-# LOAD DATA
+# Core statistical features used as base inputs for model
+FEATURES = [
+    "offensiveRating",
+    "defensiveRating",
+    "netRating",
+    "trueShootingPercentage",
+    "effectiveFieldGoalPercentage",
+    "pace",
+    "possessions",
+    "assistToTurnover",
+    "reboundPercentage",
+    "PIE"
+]
+
+# ELO RATING SYSTEM (TEAM STRENGTH MODEL)
+# Elo is used as a secondary rating system capturing team strength over time
+
+
+def init_elo():
+    # Creates empty dictionary for storing team Elo ratings
+    return {}
+
+
+def expected_score(elo_a, elo_b):
+    # Converts Elo difference into win probability
+    # Logistic function based on standard Elo formula
+    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+
+
+def update_elo(elo_a, elo_b, margin, home_adv=50, k=20):
+    # Updates Elo ratings based on game result and margin of victory
+    # margin-of-victory scaling improves sensitivity to blowouts
+
+    # Log scaling prevents extreme swings for large margins
+    mov_factor = np.log(abs(margin) + 1) * (1.2 if margin > 0 else 1.0)
+
+    # Expected probability of team A winning
+    exp_a = expected_score(elo_a + home_adv, elo_b)
+
+    # Update rule: increase if outperform expectation, decrease otherwise
+    new_a = elo_a + k * mov_factor * (1 - exp_a)
+    new_b = elo_b + k * mov_factor * (0 - (1 - exp_a))
+
+    return new_a, new_b
+
+# FATIGUE FEATURE 
+# Measures team workload based on number of recent games played
+def compute_fatigue(team_games):
+    # Normalized fatigue score (0 = rested, 1 = heavily fatigued)
+    return min(len(team_games) / ROLLING_WINDOW, 1.0)
+
+# Pulls historical NBA game data from SQLite database
 def load_historical_games():
-    """
-    Loads historical NBA game data from SQLite database.
-    Data is ordered chronologically to preserve time-series integrity.
-    """
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM model_dataset ORDER BY GAME_DATE", conn)
+
+    # model_dataset must contain preprocessed game-level stats
+    df = pd.read_sql_query(
+        "SELECT * FROM model_dataset ORDER BY GAME_DATE",
+        conn
+    )
+
     conn.close()
     return df
 
-# CLEANING HELPERS
-def safe_minutes(val):
-    """
-    Converts minutes played into float format.
-    Handles formats like:
-    - "34" → 34.0
-    - "34:21" → 34.35
-    - invalid → 0.0
-    """
-    try:
-        return float(val)
-    except ValueError:
-        try:
-            parts = val.split(":")
-            if len(parts) == 2:
-                return int(parts[0]) + int(parts[1]) / 60
-            else:
-                return float(parts[0])
-        except:
-            return 0.0
-
+# DATA CLEANING 
 def convert_minutes(df):
-    """
-    Applies safe_minutes conversion to all columns containing 'minutes'.
-    """
-    for col in df.columns:
-        if "minutes" in col.lower():
-            df[col] = df[col].astype(str).apply(lambda x: safe_minutes(x))
+    # converting string minutes to numeric if needed
     return df
+
 
 def force_numeric(df, cols):
-    """
-    Forces selected columns to numeric type.
-    Invalid values are coerced into NaN.
-    """
-    for col in cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Ensures all selected feature columns are numeric
+    # Non-numeric values are coerced into NaN
+    for c in cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
-# ROLLING FEATURES
+# ROLLING FEATURE 
+# shift(1) prevents using future data (no leakage) by shifting values
+
 def add_rolling_features(df, features):
-    """
-    Creates rolling mean and standard deviation features
-    for both team and opponent using past games only (shifted).
-    """
+    # Ensure chronological order before computing rolling statistics
     df = df.sort_values("GAME_DATE").copy()
 
     for f in features:
-        # Ensure column exists
-        if f not in df.columns:
-            df[f] = 0
-
-        # Convert to numeric and fill missing
+        # Clean feature values
         df[f] = pd.to_numeric(df[f], errors="coerce").fillna(0)
 
-        # Rolling average (team)
+        # TEAM rolling average 
         df[f"{f}_rolling"] = (
             df.groupby("TEAM_ID")[f]
             .transform(lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).mean())
         )
 
-        # Rolling average (opponent)
+        # OPPONENT rolling average
         df[f"{f}_rolling_OPP"] = (
             df.groupby("TEAM_ID_OPP")[f]
             .transform(lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).mean())
         )
 
-        # Rolling standard deviation (team)
-        df[f"{f}_std"] = (
-            df.groupby("TEAM_ID")[f]
-            .transform(lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).std())
-        ).fillna(0)
-
-        # Rolling standard deviation (opponent)
-        df[f"{f}_std_OPP"] = (
-            df.groupby("TEAM_ID_OPP")[f]
-            .transform(lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).std())
-        ).fillna(0)
-
     return df
 
-# FEATURE ENGINEERING
+# FEATURE ENGINEERING 
+# Converts raw dataset into ML-ready feature matrix
+
 def prepare_features(df):
-    """
-    Main feature engineering pipeline:
-    - Cleans data
-    - Generates rolling stats
-    - Creates differential features (team vs opponent)
-    - Adds contextual features (home, streaks)
-    """
+    # basic cleaning
     df = convert_minutes(df)
+    df = force_numeric(df, FEATURES)
 
-    # Core statistical features
-    features = ["points", "reboundsTotal", "assists", "minutes"]
-    df = force_numeric(df, features)
+    # rolling statistics
+    df = add_rolling_features(df, FEATURES)
 
-    # Ensure opponent stats are numeric
-    for f in features:
-        opp_col = f"{f}_OPP"
-        if opp_col in df.columns:
-            df[opp_col] = pd.to_numeric(df[opp_col], errors="coerce")
+    feature_cols = []
 
-    df = df.fillna(0)
-
-    # Add rolling statistics
-    df = add_rolling_features(df, features)
-
-    # DIFFERENTIAL FEATURES (team - opponent)
-    for f in features:
+    #derive comparative team features
+    for f in FEATURES:
+        # Difference between team and opponent form
         df[f"{f}_diff"] = df[f"{f}_rolling"] - df[f"{f}_rolling_OPP"]
-        df[f"{f}_std_diff"] = df[f"{f}_std"] - df[f"{f}_std_OPP"]
 
-    # HOME/AWAY INDICATOR
-    if "HOME_TEAM_ID" in df.columns:
-        df['is_home'] = (df['TEAM_ID'] == df['HOME_TEAM_ID']).astype(int)
-    else:
-        df['is_home'] = 0
+        # Raw rolling values for model signal retention
+        df[f"{f}_team"] = df[f"{f}_rolling"]
+        df[f"{f}_opp"] = df[f"{f}_rolling_OPP"]
 
-    # WIN/LOSS STREAK FEATURES
+        # Track feature names for model input
+        feature_cols += [
+            f"{f}_diff",
+            f"{f}_team",
+            f"{f}_opp"
+        ]
+
+    # HOME ADVANTAGE FEATURE
+    df["is_home"] = 1
+
+    # WIN STREAK FEATURE
     if "WIN" in df.columns:
-        df['win_streak'] = df.groupby('TEAM_ID')['WIN'].transform(
+        df["win_streak"] = df.groupby("TEAM_ID")["WIN"].transform(
             lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum()
         )
-        df['loss_streak'] = df.groupby('TEAM_ID')['WIN'].transform(
-            lambda x: (1 - x).shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum()
-        )
     else:
-        df['win_streak'] = 0
-        df['loss_streak'] = 0
+        df["win_streak"] = 0
 
-    # Final feature set
-    feature_cols = []
-    for f in features:
-        feature_cols += [f"{f}_diff", f"{f}_std_diff"]
-    feature_cols += ['is_home', 'win_streak', 'loss_streak']
+    df["loss_streak"] = 0
 
-    # Feature matrix and labels
+    feature_cols += ["is_home", "win_streak", "loss_streak"]
+
+    # Final ML matrices
     X = df[feature_cols].fillna(0)
-    y = df["WIN"].astype(int) if "WIN" in df.columns else pd.Series([0]*len(df))
+    y = df["WIN"].astype(int) if "WIN" in df.columns else pd.Series([0] * len(df))
 
     return X, y, feature_cols
 
-# TRAIN MODEL
+# MODEL TRAINING XGBOOST
 def train_model():
-    """
-    Trains XGBoost model on historical data and evaluates performance.
-    Saves trained model + feature list.
-    """
+    # Load dataset from database
     df = load_historical_games()
+
+    # Convert raw data into ML features
     X, y, feature_cols = prepare_features(df)
 
-    # Time-based split (NOT random)
+    # Time-based split prevents leakage from future games
     split = int(len(X) * 0.8)
+
     X_train, X_test = X.iloc[:split], X.iloc[split:]
     y_train, y_test = y.iloc[:split], y.iloc[split:]
 
-    # Model configuration
+    # Initialize gradient boosting model
     model = xgb.XGBClassifier(
-        n_estimators=250,
+        n_estimators=300,
         max_depth=4,
         learning_rate=0.04,
         subsample=0.8,
         colsample_bytree=0.8,
-        eval_metric="logloss",
-        use_label_encoder=False,
-        random_state=42
+        eval_metric="logloss"
     )
 
-    print(f"Training model on {len(X_train)} games...")
+
+    # Train model
     model.fit(X_train, y_train)
 
-    # Evaluation
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
+    # Generate predictions
+    preds = model.predict(X_test)
+    probs = model.predict_proba(X_test)[:, 1]
 
-    print("\n--- Model Evaluation ---")
-    print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
-    print(f"ROC-AUC : {roc_auc_score(y_test, y_proba):.4f}")
-    print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+    # MODEL EVALUATION
+    print("\n--- MODEL PERFORMANCE ---")
+    print("Accuracy:", accuracy_score(y_test, preds))
+    print("ROC-AUC:", roc_auc_score(y_test, probs))
+    print("Confusion Matrix:\n", confusion_matrix(y_test, preds))
 
-    # Save model
+    # Save trained model + feature schema
     with open(MODEL_PATH, "wb") as f:
         pickle.dump({"model": model, "features": feature_cols}, f)
 
-    print("\nModel saved\n")
-    return model
+    return model, feature_cols
 
-# BUILD LIVE FEATURES
+# LIVE FEATURES
+# Constructs real-time feature vectors for upcoming games
+
 def build_live_features(team_id, opp_id):
-    """
-    Builds feature vector for a single live matchup using
-    most recent ROLLING_WINDOW games for both teams.
-    """
     conn = sqlite3.connect(DB_PATH)
 
-    # Get recent games
+    # Pull recent team performance window
     team_df = pd.read_sql_query(
         f"SELECT * FROM model_dataset WHERE TEAM_ID={team_id} ORDER BY GAME_DATE DESC LIMIT {ROLLING_WINDOW}",
         conn
     )
+
+    # Pull opponent performance window
     opp_df = pd.read_sql_query(
         f"SELECT * FROM model_dataset WHERE TEAM_ID={opp_id} ORDER BY GAME_DATE DESC LIMIT {ROLLING_WINDOW}",
         conn
@@ -243,60 +231,47 @@ def build_live_features(team_id, opp_id):
 
     row = {}
 
-    # Compute averages and standard deviations
-    for f in ["points", "reboundsTotal", "assists", "minutes"]:
-        team_avg = pd.to_numeric(team_df[f], errors="coerce").mean() if f in team_df else 0
-        opp_avg = pd.to_numeric(opp_df[f], errors="coerce").mean() if f in opp_df else 0
-        team_std = pd.to_numeric(team_df[f], errors="coerce").std() if f in team_df else 0
-        opp_std = pd.to_numeric(opp_df[f], errors="coerce").std() if f in opp_df else 0
+    # Compute real-time statistical comparisons
+    for f in FEATURES:
+        row[f"{f}_diff"] = team_df[f].mean() - opp_df[f].mean()
+        row[f"{f}_team"] = team_df[f].mean()
+        row[f"{f}_opp"] = opp_df[f].mean()
 
-        row[f"{f}_diff"] = team_avg - opp_avg
-        row[f"{f}_std_diff"] = team_std - opp_std
-
-    # Context features (simplified for live prediction)
-    row['is_home'] = 1
-    row['win_streak'] = 0
-    row['loss_streak'] = 0
+    # Static features
+    row["is_home"] = 1
+    row["win_streak"] = 0
+    row["loss_streak"] = 0
 
     return pd.DataFrame([row]).fillna(0)
 
-# LOCK LOGIC
-def get_confidence_label(prob, lock_threshold=0.65, likely_threshold=0.55):
-    """
-    Converts probability into human-readable confidence tier.
-    """
-    if prob >= lock_threshold:
+# CONFIDENCE LOGIC
+# Converts probability output into human-readable confidence tiers
+
+def get_confidence_label(prob):
+    edge = abs(prob - 0.5)
+
+    if edge >= 0.20:
         return "Lock"
-    elif prob >= likely_threshold:
+    elif edge >= 0.10:
         return "Likely"
-    elif prob <= (1 - lock_threshold):
-        return "Upset Possible"
     else:
         return "Toss-Up"
 
-# PREDICT TODAY
-def predict_today(model):
-    """
-    Pulls today's NBA games and generates predictions.
-    Saves results to database.
-    """
-    print("\nRunning today's NBA predictions...\n")
+# LIVE GAME PREDICTION 
 
-    today_str = datetime.today().strftime("%Y-%m-%d")
+def predict_today(model, feature_cols):
+    print("\n--- TODAY'S PREDICTIONS ---\n")
 
-    # Fetch today's games
-    board = scoreboardv3.ScoreboardV3(game_date=today_str)
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    # Fetch live NBA schedule
+    board = scoreboardv3.ScoreboardV3(game_date=today)
     teams_df = board.get_data_frames()[2]
 
-    if teams_df.empty:
-        print("No NBA games scheduled today")
-        return
-
-    # Map team IDs to names
     team_map = dict(zip(teams_df["teamId"], teams_df["teamName"]))
+
     results = []
 
-    # Loop through each game
     for gid in teams_df["gameId"].unique():
         g = teams_df[teams_df["gameId"] == gid]
 
@@ -305,54 +280,35 @@ def predict_today(model):
 
         home_id, away_id = g["teamId"].values
 
-        try:
-            # Build features and predict
-            X_home = build_live_features(home_id, away_id)
-            prob = model.predict_proba(X_home)[0][1]
+        # Build feature vector for matchup
+        X = build_live_features(home_id, away_id)
 
-            # Confidence labels
-            home_conf = get_confidence_label(prob)
-            away_conf = get_confidence_label(1 - prob)
+        # Ensure feature alignment with training
+        X = X.reindex(columns=feature_cols, fill_value=0)
 
-            # Store result
-            results.append({
-                "GAME_ID": gid,
-                "HOME_TEAM_ID": home_id,
-                "AWAY_TEAM_ID": away_id,
-                "HOME_TEAM_NAME": team_map.get(home_id),
-                "AWAY_TEAM_NAME": team_map.get(away_id),
-                "PREDICTION_DATE": today_str,
-                "HOME_WIN_PROB": round(prob * 100, 2),
-                "AWAY_WIN_PROB": round((1 - prob) * 100, 2),
-                "PREDICTED_WINNER": team_map.get(home_id) if prob > 0.5 else team_map.get(away_id),
-                "HOME_CONFIDENCE": home_conf,
-                "AWAY_CONFIDENCE": away_conf
-            })
+        # Predict win probability
+        prob = model.predict_proba(X)[0][1]
 
-        except Exception as e:
-            print(f"Error on game {gid}: {e}")
+        results.append({
+            "GAME_ID": gid,
+            "HOME": team_map[home_id],
+            "AWAY": team_map[away_id],
+            "HOME_PROB": round(prob * 100, 2),
+            "AWAY_PROB": round((1 - prob) * 100, 2),
+            "PREDICTION": team_map[home_id] if prob > 0.5 else team_map[away_id],
+            "CONFIDENCE": get_confidence_label(prob),
+            "DATE": today
+        })
 
-    # Save predictions
-    if results:
-        df = pd.DataFrame(results)
+    df = pd.DataFrame(results)
 
-        conn = sqlite3.connect(DB_PATH)
-        df.to_sql("predictions_today", conn, if_exists="replace", index=False)
-        conn.close()
+    print(df)
 
-        print("\nPredictions saved to predictions_today\n")
+    # Store predictions in database for tracking
+    conn = sqlite3.connect(DB_PATH)
+    df.to_sql("predictions_today", conn, if_exists="replace", index=False)
+    conn.close()
 
-        # Display key results
-        print(df[['GAME_ID', 'HOME_TEAM_NAME', 'AWAY_TEAM_NAME', 
-                  'HOME_WIN_PROB', 'HOME_CONFIDENCE', 
-                  'AWAY_WIN_PROB', 'AWAY_CONFIDENCE', 
-                  'PREDICTED_WINNER']])
-    else:
-        print("No predictions generated")
-
-# MAIN EXECUTION
 if __name__ == "__main__":
-    model = train_model()
-
-    if model is not None:
-        predict_today(model)
+    model, feature_cols = train_model()
+    predict_today(model, feature_cols)
