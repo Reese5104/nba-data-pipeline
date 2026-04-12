@@ -20,7 +20,7 @@ from nba_api.stats.endpoints import scoreboardv3
 # CONFIGURATION CONSTANTS
 DB_PATH = "nba_data.db"      # SQLite database path
 MODEL_PATH = "nba_model.pkl" # Saved trained model
-ROLLING_WINDOW = 25          # Number of past games used for rolling stats
+ROLLING_WINDOW = 85          # Number of past games used for rolling stats
 
 # LOAD DATA
 def load_historical_games():
