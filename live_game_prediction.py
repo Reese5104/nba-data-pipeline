@@ -123,10 +123,17 @@ def prepare_features(df):
         if f"{f}_rolling" not in df.columns or f"{f}_rolling_OPP" not in df.columns:
             continue
 
+       # create difference feature (team vs opponent advantage)
         df[f"{f}_diff"] = df[f"{f}_rolling"] - df[f"{f}_rolling_OPP"]
+
+        # store team's rolling average (Home Team Strength)
         df[f"{f}_team"] = df[f"{f}_rolling"]
+        
+        # store opponent's rolling average (OPP strength)
         df[f"{f}_opp"] = df[f"{f}_rolling_OPP"]
 
+        # create ratio feature (relative strength, How much better)
+        # +1e-5 prevents division by zero
         df[f"{f}_ratio"] = df[f"{f}_rolling"] / (df[f"{f}_rolling_OPP"] + 1e-5)
 
         feature_cols += [
@@ -136,17 +143,17 @@ def prepare_features(df):
             f"{f}_ratio"
         ]
 
-    # home advantage feature (placeholder)
+    # home advantage feature 
     df["is_home"] = 1
 
-    # win streak feature if available
+    # win streak feature 
     df["win_streak"] = (
         df.groupby("TEAM_ID")["WIN"]
         .transform(lambda x: x.shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum())
         if "WIN" in df.columns else 0
     )
 
-    # placeholder loss streak
+    # loss streak
     df["loss_streak"] = (
         df.groupby("TEAM_ID")["WIN"]
         .transform(lambda x: (1 - x).shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum())
@@ -230,13 +237,23 @@ def build_live_features(team_id, opp_id):
     # build feature differences
     for f in FEATURES:
 
+        # compute team's recent average for stat rolling window 
         row[f"{f}_team"] = team_df[f].tail(ROLLING_WINDOW).mean()
+
+        # compute opponent's recent average for the same stat
         row[f"{f}_opp"] = opp_df[f].tail(ROLLING_WINDOW).mean()
+
+        # compute difference (team advantage over opponent)
         row[f"{f}_diff"] = row[f"{f}_team"] - row[f"{f}_opp"]
 
     # static features
+    # indicate this team is playing at home (1 = home, 0 = away)
     row["is_home"] = 1
+    
+    # placeholder for recent wins (not dynamically calculated here)
     row["win_streak"] = 0
+    
+    # placeholder for recent losses (not dynamically calculated here)
     row["loss_streak"] = 0
 
     return pd.DataFrame([row]).fillna(0)
