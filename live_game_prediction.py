@@ -120,14 +120,20 @@ def prepare_features(df):
     # create team vs opponent comparisons
     for f in FEATURES:
 
+        if f"{f}_rolling" not in df.columns or f"{f}_rolling_OPP" not in df.columns:
+            continue
+
         df[f"{f}_diff"] = df[f"{f}_rolling"] - df[f"{f}_rolling_OPP"]
         df[f"{f}_team"] = df[f"{f}_rolling"]
         df[f"{f}_opp"] = df[f"{f}_rolling_OPP"]
 
+        df[f"{f}_ratio"] = df[f"{f}_rolling"] / (df[f"{f}_rolling_OPP"] + 1e-5)
+
         feature_cols += [
             f"{f}_diff",
             f"{f}_team",
-            f"{f}_opp"
+            f"{f}_opp",
+            f"{f}_ratio"
         ]
 
     # home advantage feature (placeholder)
@@ -141,8 +147,10 @@ def prepare_features(df):
     )
 
     # placeholder loss streak
-    df["loss_streak"] = 0
-
+    df["loss_streak"] = (
+        df.groupby("TEAM_ID")["WIN"]
+        .transform(lambda x: (1 - x).shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum())
+)
     feature_cols += ["is_home", "win_streak", "loss_streak"]
 
     # final ML matrices
