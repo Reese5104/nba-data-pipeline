@@ -229,9 +229,10 @@ def build_live_features(team_id, opp_id):
 
     # build feature differences
     for f in FEATURES:
-        row[f"{f}_diff"] = team_df[f].mean() - opp_df[f].mean()
-        row[f"{f}_team"] = team_df[f].mean()
-        row[f"{f}_opp"] = opp_df[f].mean()
+
+        row[f"{f}_team"] = team_df[f].tail(ROLLING_WINDOW).mean()
+        row[f"{f}_opp"] = opp_df[f].tail(ROLLING_WINDOW).mean()
+        row[f"{f}_diff"] = row[f"{f}_team"] - row[f"{f}_opp"]
 
     # static features
     row["is_home"] = 1
