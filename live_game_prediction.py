@@ -264,14 +264,27 @@ def get_confidence_label(prob):
 
     # distance from 0.5 determines confidence
     edge = abs(prob - 0.5)
+   
+    '''
+     Toss-Up: No real edge, basically coin flip
+    
+     Lean: Slight edge, but not strong enough to trust heavily
+    
+     Strong Lean: Clear statistical edge
+    
+     Lock: Very strong model confidence (rare in NBA)
+    '''
 
     if edge >= 0.20:
-        return "Lock"
-    elif edge >= 0.10:
-        return "Likely"
+        confidence = "Lock"
+    elif edge >= 0.12:
+        confidence = "Strong Lean"
+    elif edge >= 0.06:
+        confidence = "Lean"
     else:
-        return "Toss-Up"
+        confidence = "Toss-Up"
 
+    return confidence
 
 # PREDICTION PIPELINE
 def predict_today(model, feature_cols):
