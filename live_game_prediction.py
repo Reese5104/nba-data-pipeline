@@ -7,6 +7,7 @@ import xgboost as xgb
 from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
 from datetime import datetime, timedelta
 from nba_api.stats.endpoints import scoreboardv3
+from sklearn.calibration import CalibratedClassifierCV
 
 DB_PATH = "nba_data.db"          # database with historical games
 MODEL_PATH = "nba_model.pkl"     # saved model file
@@ -182,8 +183,7 @@ def train_model():
     X_train, X_test = X.iloc[:split], X.iloc[split:]
     y_train, y_test = y.iloc[:split], y.iloc[split:]
 
-    # XGBoost model
-    model = xgb.XGBClassifier(
+    base_model = xgb.XGBClassifier(
         n_estimators=300,
         max_depth=4,
         learning_rate=0.04,
@@ -192,25 +192,27 @@ def train_model():
         eval_metric="logloss"
     )
 
-    # train model
+    # calibrates XGBoost probabilities so outputs reflect real-world win rates instead of overconfident raw scores
+    model = CalibratedClassifierCV(
+        estimator=base_model,
+        method="isotonic",
+        cv=3
+    )
+
+    # train
     model.fit(X_train, y_train)
 
-    # predictions
+    # Predictions
     preds = model.predict(X_test)
     probs = model.predict_proba(X_test)[:, 1]
 
-    # evaluation
+    # Evaluations 
     print("\n--- MODEL PERFORMANCE ---")
     print("Accuracy:", accuracy_score(y_test, preds))
     print("ROC-AUC:", roc_auc_score(y_test, probs))
     print("Confusion Matrix:\n", confusion_matrix(y_test, preds))
 
-    # save model
-    with open(MODEL_PATH, "wb") as f:
-        pickle.dump({"model": model, "features": feature_cols}, f)
-
     return model, feature_cols
-
 
 # LIVE FEATURES
 def build_live_features(team_id, opp_id):
