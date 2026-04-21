@@ -162,8 +162,10 @@ def prepare_features(df):
     feature_cols += ["is_home", "win_streak", "loss_streak"]
     
     
-    # final ML matrices
+    # select only model features and replace missing values NaN with 0 so the model can process them
     X = df[feature_cols].fillna(0)
+    
+    # 1 if win, 0 if loss
     y = df["WIN"].astype(int) if "WIN" in df.columns else pd.Series([0] * len(df))
 
     return X, y, feature_cols
@@ -288,7 +290,7 @@ def get_confidence_label(prob):
     elif prob >= 0.75 or prob <= 0.25:
         return "Clear Edge"
 
-    elif prob >= 0.65 or prob <= 0.35:
+    elif prob >= 0.60 or prob <= 0.40:
         return "Slight Edge"
 
     else:
@@ -318,20 +320,23 @@ def predict_today(model, feature_cols):
     # loop games
     for gid in teams_df["gameId"].unique():
 
-        g = teams_df[teams_df["gameId"] == gid]
+        # get the two rows (home + away teams) for this specific game
+        g = teams_df[teams_df["gameId"] == gid]     
 
+        # skip if data is incomplete
         if len(g) != 2:
             continue
 
+        # extract team IDs
         home_id, away_id = g["teamId"].values
 
-        # build feature vector
+        # build feature vector from the perspective of the home team vs opponent
         X = build_live_features(home_id, away_id)
 
-        # align with training features
+        # ensure feature columns match training data 
         X = X.reindex(columns=feature_cols, fill_value=0)
 
-        # predict probability
+        # predict probability that the HOME team wins
         prob = model.predict_proba(X)[0][1]
 
         results.append({
