@@ -143,9 +143,9 @@ def prepare_features(df):
             f"{f}_opp",
             f"{f}_ratio"
         ]
-
+    
     # home advantage feature 
-    df["is_home"] = 1
+    df["is_home"] = (df["TEAM_ID"] == df["HOME_TEAM_ID"]).astype(int)
 
     # win streak feature 
     df["win_streak"] = (
@@ -160,7 +160,8 @@ def prepare_features(df):
         .transform(lambda x: (1 - x).shift(1).rolling(ROLLING_WINDOW, min_periods=1).sum())
 )
     feature_cols += ["is_home", "win_streak", "loss_streak"]
-
+    
+    
     # final ML matrices
     X = df[feature_cols].fillna(0)
     y = df["WIN"].astype(int) if "WIN" in df.columns else pd.Series([0] * len(df))
@@ -248,45 +249,51 @@ def build_live_features(team_id, opp_id):
         # compute difference (team advantage over opponent)
         row[f"{f}_diff"] = row[f"{f}_team"] - row[f"{f}_opp"]
 
+    
     # static features
-    # indicate this team is playing at home (1 = home, 0 = away)
     row["is_home"] = 1
-    
-    # placeholder for recent wins (not dynamically calculated here)
-    row["win_streak"] = 0
-    
-    # placeholder for recent losses (not dynamically calculated here)
-    row["loss_streak"] = 0
+
+    # compute recent win/loss counts 
+    if "WIN" in team_df.columns:
+        recent = team_df.sort_values("GAME_DATE")
+
+        row["win_streak"] = recent["WIN"].tail(ROLLING_WINDOW).sum()
+        row["loss_streak"] = (1 - recent["WIN"]).tail(ROLLING_WINDOW).sum()
+    else:
+        row["win_streak"] = 0
+        row["loss_streak"] = 0
 
     return pd.DataFrame([row]).fillna(0)
-
+    
 
 # CONFIDENCE LABELS
 def get_confidence_label(prob):
 
-    # distance from 0.5 determines confidence
-    edge = abs(prob - 0.5)
-   
     '''
-     Toss-Up: No real edge, basically coin flip
-    
-     Lean: Slight edge, but not strong enough to trust heavily
-    
-     Strong Lean: Clear statistical edge
-    
-     Lock: Very strong model confidence (rare in NBA)
+    Very Strong Edge: Large probability separation — model is highly confident (rare outcome)
+
+    Clear Edge: Noticeable statistical advantage — one side is strongly favored
+
+    Slight Edge: Small probability gap — mild lean, but outcome remains volatile
+
+    Even Match: Minimal or no separation — essentially a coin flip
     '''
 
-    if edge >= 0.20:
-        confidence = "Lock"
-    elif edge >= 0.12:
-        confidence = "Strong Lean"
-    elif edge >= 0.06:
-        confidence = "Lean"
+    # shrink extreme confidence slightly (NBA uncertainty adjustment)
+    prob = min(max(prob, 0.05), 0.95)
+
+    if prob >= 0.85 or prob <= 0.15:
+        return "Very Strong Edge"
+
+    elif prob >= 0.75 or prob <= 0.25:
+        return "Clear Edge"
+
+    elif prob >= 0.65 or prob <= 0.35:
+        return "Slight Edge"
+
     else:
-        confidence = "Toss-Up"
+        return "Even Match"
 
-    return confidence
 
 # PREDICTION PIPELINE
 def predict_today(model, feature_cols):
