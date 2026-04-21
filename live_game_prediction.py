@@ -279,7 +279,7 @@ def get_confidence_label(prob):
     Even Match: Minimal or no separation — essentially a coin flip
     '''
 
-    # shrink extreme confidence slightly (NBA uncertainty adjustment)
+    # shrink extreme confidence slightly 
     prob = min(max(prob, 0.05), 0.95)
 
     if prob >= 0.85 or prob <= 0.15:
