@@ -130,7 +130,7 @@ The ML pipeline uses **XGBoost** for game predictions. Example metrics from test
 
 * PIE (Player Impact Estimate)
 * Estimated Offensive Rating
-* Assist Percentage
+* Assist to Turnover
 
 > These metrics are calculated using historical game and player statistics to predict future outcomes.
 
